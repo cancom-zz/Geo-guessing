@@ -1,456 +1,428 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Guess the Country</title>
-  <style>
-    html, body {
-      margin: 0; padding: 0;
-      font-family: sans-serif;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    #map {
-      width: 100%;
-      max-width: 800px;
-      height: 500px;
-      border: 1px solid #ccc;
-      touch-action: none;
-      background-color: #eaeaea; /* subtle background so countries stand out */
-    }
-    #controls {
-      margin-top: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    #autocomplete {
-      width: 250px;
-      padding: 5px;
-      font-size: 1em;
-    }
-    #hintBtn, #resetZoomBtn {
-      margin-top: 5px;
-      cursor: pointer;
-      padding: 8px 14px;
-      font-size: 1em;
-      border: 1px solid #666;
-      background-color: #f0f0f0;
-      border-radius: 4px;
-      user-select: none;
-      transition: background-color 0.2s;
-    }
-    #hintBtn:hover, #resetZoomBtn:hover {
-      background-color: #ddd;
-    }
-    .country {
-      cursor: pointer;
-      stroke: #fff;
-      stroke-width: 0.5;
-      fill: #b0b0b0;
-      transition: fill 0.3s;
-    }
-    .correct {
-      fill: green !important;
-    }
-    .wrong {
-      fill: red !important;
-    }
-    .hovered {
-      fill: orange;
-    }
-    #score {
-      margin-top: 10px;
-      font-weight: bold;
-    }
-    #flagCongrats {
-      position: fixed;
-      top: 30px;
-      right: 30px;
-      font-size: 4em;
-      pointer-events: none;
-      user-select: none;
-      opacity: 0;
-      transition: opacity 0.5s ease-in-out;
-      z-index: 1000;
-    }
-  </style>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Guess the Country - Enhanced</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    font-family: sans-serif;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #map {
+    width: 90vw;
+    max-width: 1000px;
+    height: 80vh;
+    border: 1px solid #ccc;
+    background-color: #eaeaea;
+    touch-action: none;
+  }
+  #controls {
+    margin: 10px 0;
+    width: 90vw;
+    max-width: 400px;
+    position: relative;
+    user-select: none;
+  }
+  #autocomplete {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 1.1em;
+    box-sizing: border-box;
+  }
+  #autocomplete:focus {
+    outline: 2px solid #0078d4;
+  }
+  #autocompleteList {
+    position: absolute;
+    top: 110%;
+    left: 0;
+    right: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    z-index: 100;
+  }
+  .autocomplete-item {
+    padding: 6px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .autocomplete-item:hover, .autocomplete-item.active {
+    background-color: #0078d4;
+    color: white;
+  }
+  .flag-emoji {
+    font-size: 1.3em;
+  }
+  #hintBtn, #resetZoomBtn {
+    margin-top: 10px;
+    cursor: pointer;
+    padding: 8px 16px;
+    font-size: 1em;
+    border: 1px solid #666;
+    background-color: #f0f0f0;
+    border-radius: 4px;
+    user-select: none;
+    transition: background-color 0.2s;
+    margin-right: 8px;
+  }
+  #hintBtn:hover, #resetZoomBtn:hover {
+    background-color: #ddd;
+  }
+  #buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+  .country {
+    cursor: pointer;
+    stroke: #fff;
+    stroke-width: 0.5;
+    fill: #b0b0b0;
+    transition: fill 0.3s;
+  }
+  .selected-country {
+    fill: orange !important;
+  }
+  .correct {
+    fill: green !important;
+  }
+  .wrong {
+    fill: red !important;
+  }
+  #score {
+    margin-top: 10px;
+    font-weight: bold;
+    font-size: 1.2em;
+  }
+  #flagCongrats {
+    position: fixed;
+    top: 30px;
+    right: 30px;
+    font-size: 4em;
+    pointer-events: none;
+    user-select: none;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    z-index: 1000;
+  }
+</style>
+<script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
   <h2>Guess the Country</h2>
   <div id="map"></div>
   <div id="controls">
-    <input id="autocomplete" list="countries" placeholder="Type a country..." autocomplete="off" />
-    <button id="hintBtn" type="button">Hint</button>
-    <button id="resetZoomBtn" type="button">Reset Zoom</button>
+    <input id="autocomplete" placeholder="Type a country..." autocomplete="off" />
+    <div id="autocompleteList" hidden></div>
+    <div id="buttons">
+      <button id="hintBtn" type="button">Hint</button>
+      <button id="resetZoomBtn" type="button">Reset Zoom</button>
+    </div>
     <div id="score">Score: 0</div>
-    <datalist id="countries"></datalist>
   </div>
   <div id="flagCongrats"></div>
 
-  <script>
-    const countryData = {
-    "Afghanistan": "Kabul",
-      "Albania": "Tirana",
-      "Algeria": "Algiers",
-      "Andorra": "Andorra la Vella",
-      "Angola": "Luanda",
-      "Argentina": "Buenos Aires",
-      "Armenia": "Yerevan",
-      "Australia": "Canberra",
-      "Austria": "Vienna",
-      "Azerbaijan": "Baku",
-      "Bahamas": "Nassau",
-      "Bahrain": "Manama",
-      "Bangladesh": "Dhaka",
-      "Barbados": "Bridgetown",
-      "Belarus": "Minsk",
-      "Belgium": "Brussels",
-      "Belize": "Belmopan",
-      "Benin": "Porto-Novo",
-      "Bhutan": "Thimphu",
-      "Bolivia": "Sucre",
-      "Bosnia and Herzegovina": "Sarajevo",
-      "Botswana": "Gaborone",
-      "Brazil": "Brasília",
-      "Brunei": "Bandar Seri Begawan",
-      "Bulgaria": "Sofia",
-      "Burkina Faso": "Ouagadougou",
-      "Burundi": "Gitega",
-      "Cambodia": "Phnom Penh",
-      "Cameroon": "Yaoundé",
-      "Canada": "Ottawa",
-      "Cape Verde": "Praia",
-      "Central African Republic": "Bangui",
-      "Chad": "N'Djamena",
-      "Chile": "Santiago",
-      "China": "Beijing",
-      "Colombia": "Bogotá",
-      "Comoros": "Moroni",
-      "Congo (Brazzaville)": "Brazzaville",
-      "Congo (Kinshasa)": "Kinshasa",
-      "Costa Rica": "San José",
-      "Croatia": "Zagreb",
-      "Cuba": "Havana",
-      "Cyprus": "Nicosia",
-      "Czech Republic": "Prague",
-      "Denmark": "Copenhagen",
-      "Djibouti": "Djibouti",
-      "Dominica": "Roseau",
-      "Dominican Republic": "Santo Domingo",
-      "East Timor": "Dili",
-      "Ecuador": "Quito",
-      "Egypt": "Cairo",
-      "El Salvador": "San Salvador",
-      "Equatorial Guinea": "Malabo",
-      "Eritrea": "Asmara",
-      "Estonia": "Tallinn",
-      "Eswatini": "Mbabane",
-      "Ethiopia": "Addis Ababa",
-      "Fiji": "Suva",
-      "Finland": "Helsinki",
-      "France": "Paris",
-      "Gabon": "Libreville",
-      "Gambia": "Banjul",
-      "Georgia": "Tbilisi",
-      "Germany": "Berlin",
-      "Ghana": "Accra",
-      "Greece": "Athens",
-      "Grenada": "St. George's",
-      "Guatemala": "Guatemala City",
-      "Guinea": "Conakry",
-      "Guinea-Bissau": "Bissau",
-      "Guyana": "Georgetown",
-      "Haiti": "Port-au-Prince",
-      "Honduras": "Tegucigalpa",
-      "Hungary": "Budapest",
-      "Iceland": "Reykjavík",
-      "India": "New Delhi",
-      "Indonesia": "Jakarta",
-      "Iran": "Tehran",
-      "Iraq": "Baghdad",
-      "Ireland": "Dublin",
-      "Israel": "Jerusalem",
-      "Italy": "Rome",
-      "Ivory Coast": "Yamoussoukro",
-      "Jamaica": "Kingston",
-      "Japan": "Tokyo",
-      "Jordan": "Amman",
-      "Kazakhstan": "Astana",
-      "Kenya": "Nairobi",
-      "Kiribati": "Tarawa",
-      "Korea, North": "Pyongyang",
-      "Korea, South": "Seoul",
-      "Kosovo": "Pristina",
-      "Kuwait": "Kuwait City",
-      "Kyrgyzstan": "Bishkek",
-      "Laos": "Vientiane",
-      "Latvia": "Riga",
-      "Lebanon": "Beirut",
-      "Lesotho": "Maseru",
-      "Liberia": "Monrovia",
-      "Libya": "Tripoli",
-      "Liechtenstein": "Vaduz",
-      "Lithuania": "Vilnius",
-      "Luxembourg": "Luxembourg",
-      "Madagascar": "Antananarivo",
-      "Malawi": "Lilongwe",
-      "Malaysia": "Kuala Lumpur",
-      "Maldives": "Malé",
-      "Mali": "Bamako",
-      "Malta": "Valletta",
-      "Marshall Islands": "Majuro",
-      "Mauritania": "Nouakchott",
-      "Mauritius": "Port Louis",
-      "Mexico": "Mexico City",
-      "Micronesia": "Palikir",
-      "Moldova": "Chișinău",
-      "Monaco": "Monaco",
-      "Mongolia": "Ulaanbaatar",
-      "Montenegro": "Podgorica",
-      "Morocco": "Rabat",
-      "Mozambique": "Maputo",
-      "Myanmar": "Naypyidaw",
-      "Namibia": "Windhoek",
-      "Nauru": "Yaren",
-      "Nepal": "Kathmandu",
-      "Netherlands": "Amsterdam",
-      "New Zealand": "Wellington",
-      "Nicaragua": "Managua",
-      "Niger": "Niamey",
-      "Nigeria": "Abuja",
-      "North Macedonia": "Skopje",
-      "Norway": "Oslo",
-      "Oman": "Muscat",
-      "Pakistan": "Islamabad",
-      "Palau": "Ngerulmud",
-      "Panama": "Panama City",
-      "Papua New Guinea": "Port Moresby",
-      "Paraguay": "Asunción",
-      "Peru": "Lima",
-      "Philippines": "Manila",
-      "Poland": "Warsaw",
-      "Portugal": "Lisbon",
-      "Qatar": "Doha",
-      "Romania": "Bucharest",
-      "Russia": "Moscow",
-      "Rwanda": "Kigali",
-      "Saint Kitts and Nevis": "Basseterre",
-      "Saint Lucia": "Castries",
-      "Saint Vincent and the Grenadines": "Kingstown",
-      "Samoa": "Apia",
-      "San Marino": "San Marino",
-      "Sao Tome and Principe": "São Tomé",
-      "Saudi Arabia": "Riyadh",
-      "Senegal": "Dakar",
-      "Serbia": "Belgrade",
-      "Seychelles": "Victoria",
-      "Sierra Leone": "Freetown",
-      "Singapore": "Singapore",
-      "Slovakia": "Bratislava",
-      "Slovenia": "Ljubljana",
-      "Solomon Islands": "Honiara",
-      "Somalia": "Mogadishu",
-      "South Africa": "Pretoria",
-      "South Sudan": "Juba",
-      "Spain": "Madrid",
-      "Sri Lanka": "Sri Jayawardenepura Kotte",
-      "Sudan": "Khartoum",
-      "Suriname": "Paramaribo",
-      "Sweden": "Stockholm",
-      "Switzerland": "Bern",
-      "Syria": "Damascus",
-      "Taiwan": "Taipei",
-      "Tajikistan": "Dushanbe",
-      "Tanzania": "Dodoma",
-      "Thailand": "Bangkok",
-      "Togo": "Lomé",
-      "Tonga": "Nukuʻalofa",
-      "Trinidad and Tobago": "Port of Spain",
-      "Tunisia": "Tunis",
-      "Turkey": "Ankara",
-      "Turkmenistan": "Ashgabat",
-      "Tuvalu": "Funafuti",
-      "Uganda": "Kampala",
-      "Ukraine": "Kyiv",
-      "United Arab Emirates": "Abu Dhabi",
-      "United Kingdom": "London",
-      "United States": "Washington, D.C.",
-      "Uruguay": "Montevideo",
-      "Uzbekistan": "Tashkent",
-      "Vanuatu": "Port Vila",
-      "Vatican City": "Vatican City",
-      "Venezuela": "Caracas",
-      "Vietnam": "Hanoi",
-      "Yemen": "Sana'a",
-      "Zambia": "Lusaka",
-      "Zimbabwe": "Harare"
-    };
+<script>
+  // Full country-capital data
+  const countryData = {
+    "Afghanistan": "Kabul", "Albania": "Tirana", "Algeria": "Algiers", "Andorra": "Andorra la Vella", "Angola": "Luanda",
+    "Argentina": "Buenos Aires", "Armenia": "Yerevan", "Australia": "Canberra", "Austria": "Vienna", "Azerbaijan": "Baku",
+    "Bahamas": "Nassau", "Bahrain": "Manama", "Bangladesh": "Dhaka", "Barbados": "Bridgetown", "Belarus": "Minsk",
+    "Belgium": "Brussels", "Belize": "Belmopan", "Benin": "Porto-Novo", "Bhutan": "Thimphu", "Bolivia": "Sucre",
+    "Bosnia and Herzegovina": "Sarajevo", "Botswana": "Gaborone", "Brazil": "Brasília", "Brunei": "Bandar Seri Begawan",
+    "Bulgaria": "Sofia", "Burkina Faso": "Ouagadougou", "Burundi": "Gitega", "Cambodia": "Phnom Penh", "Cameroon": "Yaoundé",
+    "Canada": "Ottawa", "Cape Verde": "Praia", "Central African Republic": "Bangui", "Chad": "N'Djamena", "Chile": "Santiago",
+    "China": "Beijing", "Colombia": "Bogotá", "Comoros": "Moroni", "Congo (Brazzaville)": "Brazzaville", "Congo (Kinshasa)": "Kinshasa",
+    "Costa Rica": "San José", "Croatia": "Zagreb", "Cuba": "Havana", "Cyprus": "Nicosia", "Czech Republic": "Prague",
+    "Denmark": "Copenhagen", "Djibouti": "Djibouti", "Dominica": "Roseau", "Dominican Republic": "Santo Domingo", "East Timor": "Dili",
+    "Ecuador": "Quito", "Egypt": "Cairo", "El Salvador": "San Salvador", "Equatorial Guinea": "Malabo", "Eritrea": "Asmara",
+    "Estonia": "Tallinn", "Eswatini": "Mbabane", "Ethiopia": "Addis Ababa", "Fiji": "Suva", "Finland": "Helsinki",
+    "France": "Paris", "Gabon": "Libreville", "Gambia": "Banjul", "Georgia": "Tbilisi", "Germany": "Berlin",
+    "Ghana": "Accra", "Greece": "Athens", "Grenada": "St. George's", "Guatemala": "Guatemala City", "Guinea": "Conakry",
+    "Guinea-Bissau": "Bissau", "Guyana": "Georgetown", "Haiti": "Port-au-Prince", "Honduras": "Tegucigalpa", "Hungary": "Budapest",
+    "Iceland": "Reykjavík", "India": "New Delhi", "Indonesia": "Jakarta", "Iran": "Tehran", "Iraq": "Baghdad",
+    "Ireland": "Dublin", "Israel": "Jerusalem", "Italy": "Rome", "Ivory Coast": "Yamoussoukro", "Jamaica": "Kingston",
+    "Japan": "Tokyo", "Jordan": "Amman", "Kazakhstan": "Astana", "Kenya": "Nairobi", "Kiribati": "Tarawa",
+    "Korea, North": "Pyongyang", "Korea, South": "Seoul", "Kosovo": "Pristina", "Kuwait": "Kuwait City", "Kyrgyzstan": "Bishkek",
+    "Laos": "Vientiane", "Latvia": "Riga", "Lebanon": "Beirut", "Lesotho": "Maseru", "Liberia": "Monrovia",
+    "Libya": "Tripoli", "Liechtenstein": "Vaduz", "Lithuania": "Vilnius", "Luxembourg": "Luxembourg", "Madagascar": "Antananarivo",
+    "Malawi": "Lilongwe", "Malaysia": "Kuala Lumpur", "Maldives": "Malé", "Mali": "Bamako", "Malta": "Valletta",
+    "Marshall Islands": "Majuro", "Mauritania": "Nouakchott", "Mauritius": "Port Louis", "Mexico": "Mexico City", "Micronesia": "Palikir",
+    "Moldova": "Chișinău", "Monaco": "Monaco", "Mongolia": "Ulaanbaatar", "Montenegro": "Podgorica", "Morocco": "Rabat",
+    "Mozambique": "Maputo", "Myanmar": "Naypyidaw", "Namibia": "Windhoek", "Nauru": "Yaren", "Nepal": "Kathmandu",
+    "Netherlands": "Amsterdam", "New Zealand": "Wellington", "Nicaragua": "Managua", "Niger": "Niamey", "Nigeria": "Abuja",
+    "North Macedonia": "Skopje", "Norway": "Oslo", "Oman": "Muscat", "Pakistan": "Islamabad", "Palau": "Ngerulmud",
+    "Panama": "Panama City", "Papua New Guinea": "Port Moresby", "Paraguay": "Asunción", "Peru": "Lima", "Philippines": "Manila",
+    "Poland": "Warsaw", "Portugal": "Lisbon", "Qatar": "Doha", "Romania": "Bucharest", "Russia": "Moscow",
+    "Rwanda": "Kigali", "Saint Kitts and Nevis": "Basseterre", "Saint Lucia": "Castries", "Saint Vincent and the Grenadines": "Kingstown",
+    "Samoa": "Apia", "San Marino": "San Marino", "Sao Tome and Principe": "São Tomé", "Saudi Arabia": "Riyadh", "Senegal": "Dakar",
+    "Serbia": "Belgrade", "Seychelles": "Victoria", "Sierra Leone": "Freetown", "Singapore": "Singapore", "Slovakia": "Bratislava",
+    "Slovenia": "Ljubljana", "Solomon Islands": "Honiara", "Somalia": "Mogadishu", "South Africa": "Pretoria", "South Sudan": "Juba",
+    "Spain": "Madrid", "Sri Lanka": "Sri Jayawardenepura Kotte", "Sudan": "Khartoum", "Suriname": "Paramaribo", "Sweden": "Stockholm",
+    "Switzerland": "Bern", "Syria": "Damascus", "Taiwan": "Taipei", "Tajikistan": "Dushanbe", "Tanzania": "Dodoma",
+    "Thailand": "Bangkok", "Togo": "Lomé", "Tonga": "Nukuʻalofa", "Trinidad and Tobago": "Port of Spain", "Tunisia": "Tunis",
+    "Turkey": "Ankara", "Turkmenistan": "Ashgabat", "Tuvalu": "Funafuti", "Uganda": "Kampala", "Ukraine": "Kyiv",
+    "United Arab Emirates": "Abu Dhabi", "United Kingdom": "London", "United States": "Washington, D.C.", "Uruguay": "Montevideo",
+    "Uzbekistan": "Tashkent", "Vanuatu": "Port Vila", "Vatican City": "Vatican City", "Venezuela": "Caracas", "Vietnam": "Hanoi",
+    "Yemen": "Sana'a", "Zambia": "Lusaka", "Zimbabwe": "Harare"
+  };
 
-    // ISO mapping and flag emoji helper, same as before
-    const countryNameToISO = {
-      "Afghanistan": "AF", "Albania": "AL", "Algeria": "DZ", "Andorra": "AD", "Angola": "AO",
-      "Argentina": "AR", "Armenia": "AM", "Australia": "AU", "Austria": "AT", "Azerbaijan": "AZ",
-      "Bahamas": "BS", "Bahrain": "BH", "Bangladesh": "BD", "Barbados": "BB", "Belarus": "BY",
-      "Belgium": "BE", "Belize": "BZ", "Benin": "BJ", "Bhutan": "BT", "Bolivia": "BO",
-      "Bosnia and Herzegovina": "BA", "Botswana": "BW", "Brazil": "BR", "Brunei": "BN",
-      "Bulgaria": "BG", "Burkina Faso": "BF", "Burundi": "BI", "Cambodia": "KH", "Cameroon": "CM",
-      "Canada": "CA", "Cape Verde": "CV", "Central African Republic": "CF", "Chad": "TD",
-      "Chile": "CL", "China": "CN", "Colombia": "CO", "Comoros": "KM", "Congo (Brazzaville)": "CG",
-      "Congo (Kinshasa)": "CD", "Costa Rica": "CR", "Croatia": "HR", "Cuba": "CU", "Cyprus": "CY",
-      "Czech Republic": "CZ", "Denmark": "DK", "Djibouti": "DJ", "Dominica": "DM",
-      "Dominican Republic": "DO", "East Timor": "TL", "Ecuador": "EC", "Egypt": "EG",
-      "El Salvador": "SV", "Equatorial Guinea": "GQ", "Eritrea": "ER", "Estonia": "EE",
-      "Eswatini": "SZ", "Ethiopia": "ET", "Fiji": "FJ", "Finland": "FI", "France": "FR",
-      "Gabon": "GA", "Gambia": "GM", "Georgia": "GE", "Germany": "DE", "Ghana": "GH",
-      "Greece": "GR", "Grenada": "GD", "Guatemala": "GT", "Guinea": "GN", "Guinea-Bissau": "GW",
-      "Guyana": "GY", "Haiti": "HT", "Honduras": "HN", "Hungary": "HU", "Iceland": "IS",
-      "India": "IN", "Indonesia": "ID", "Iran": "IR", "Iraq": "IQ", "Ireland": "IE",
-      "Israel": "IL", "Italy": "IT", "Ivory Coast": "CI", "Jamaica": "JM", "Japan": "JP",
-      "Jordan": "JO", "Kazakhstan": "KZ", "Kenya": "KE", "Kiribati": "KI", "Korea, North": "KP",
-      "Korea, South": "KR", "Kosovo": "XK", "Kuwait": "KW", "Kyrgyzstan": "KG", "Laos": "LA",
-      "Latvia": "LV", "Lebanon": "LB", "Lesotho": "LS", "Liberia": "LR", "Libya": "LY",
-      "Liechtenstein": "LI", "Lithuania": "LT", "Luxembourg": "LU", "Madagascar": "MG",
-      "Malawi": "MW", "Malaysia": "MY", "Maldives": "MV", "Mali": "ML", "Malta": "MT",
-      "Marshall Islands": "MH", "Mauritania": "MR", "Mauritius": "MU", "Mexico": "MX",
-      "Micronesia": "FM", "Moldova": "MD", "Monaco": "MC", "Mongolia": "MN", "Montenegro": "ME",
-      "Morocco": "MA", "Mozambique": "MZ", "Myanmar": "MM", "Namibia": "NA", "Nauru": "NR",
-      "Nepal": "NP", "Netherlands": "NL", "New Zealand": "NZ", "Nicaragua": "NI", "Niger": "NE",
-      "Nigeria": "NG", "North Macedonia": "MK", "Norway": "NO", "Oman": "OM", "Pakistan": "PK",
-      "Palau": "PW", "Panama": "PA", "Papua New Guinea": "PG", "Paraguay": "PY", "Peru": "PE",
-      "Philippines": "PH", "Poland": "PL", "Portugal": "PT", "Qatar": "QA", "Romania": "RO",
-      "Russia": "RU", "Rwanda": "RW", "Saint Kitts and Nevis": "KN", "Saint Lucia": "LC",
-      "Saint Vincent and the Grenadines": "VC", "Samoa": "WS", "San Marino": "SM",
-      "Sao Tome and Principe": "ST", "Saudi Arabia": "SA", "Senegal": "SN", "Serbia": "RS",
-      "Seychelles": "SC", "Sierra Leone": "SL", "Singapore": "SG", "Slovakia": "SK",
-      "Slovenia": "SI", "Solomon Islands": "SB", "Somalia": "SO", "South Africa": "ZA",
-      "South Sudan": "SS", "Spain": "ES", "Sri Lanka": "LK", "Sudan": "SD", "Suriname": "SR",
-      "Sweden": "SE", "Switzerland": "CH", "Syria": "SY", "Taiwan": "TW", "Tajikistan": "TJ",
-      "Tanzania": "TZ", "Thailand": "TH", "Togo": "TG", "Tonga": "TO",
-      "Trinidad and Tobago": "TT", "Tunisia": "TN", "Turkey": "TR", "Turkmenistan": "TM",
-      "Tuvalu": "TV", "Uganda": "UG", "Ukraine": "UA", "United Arab Emirates": "AE",
-      "United Kingdom": "GB", "United States": "US", "Uruguay": "UY", "Uzbekistan": "UZ",
-      "Vanuatu": "VU", "Vatican City": "VA", "Venezuela": "VE", "Vietnam": "VN", "Yemen": "YE",
-      "Zambia": "ZM", "Zimbabwe": "ZW"
-    };
+  // ISO mapping for flags
+  const countryNameToISO = {
+    "Afghanistan": "AF", "Albania": "AL", "Algeria": "DZ", "Andorra": "AD", "Angola": "AO",
+    "Argentina": "AR", "Armenia": "AM", "Australia": "AU", "Austria": "AT", "Azerbaijan": "AZ",
+    "Bahamas": "BS", "Bahrain": "BH", "Bangladesh": "BD", "Barbados": "BB", "Belarus": "BY",
+    "Belgium": "BE", "Belize": "BZ", "Benin": "BJ", "Bhutan": "BT", "Bolivia": "BO",
+    "Bosnia and Herzegovina": "BA", "Botswana": "BW", "Brazil": "BR", "Brunei": "BN",
+    "Bulgaria": "BG", "Burkina Faso": "BF", "Burundi": "BI", "Cambodia": "KH", "Cameroon": "CM",
+    "Canada": "CA", "Cape Verde": "CV", "Central African Republic": "CF", "Chad": "TD", "Chile": "CL",
+    "China": "CN", "Colombia": "CO", "Comoros": "KM", "Congo (Brazzaville)": "CG", "Congo (Kinshasa)": "CD",
+    "Costa Rica": "CR", "Croatia": "HR", "Cuba": "CU", "Cyprus": "CY", "Czech Republic": "CZ",
+    "Denmark": "DK", "Djibouti": "DJ", "Dominica": "DM", "Dominican Republic": "DO", "East Timor": "TL",
+    "Ecuador": "EC", "Egypt": "EG", "El Salvador": "SV", "Equatorial Guinea": "GQ", "Eritrea": "ER",
+    "Estonia": "EE", "Eswatini": "SZ", "Ethiopia": "ET", "Fiji": "FJ", "Finland": "FI",
+    "France": "FR", "Gabon": "GA", "Gambia": "GM", "Georgia": "GE", "Germany": "DE",
+    "Ghana": "GH", "Greece": "GR", "Grenada": "GD", "Guatemala": "GT", "Guinea": "GN",
+    "Guinea-Bissau": "GW", "Guyana": "GY", "Haiti": "HT", "Honduras": "HN", "Hungary": "HU",
+    "Iceland": "IS", "India": "IN", "Indonesia": "ID", "Iran": "IR", "Iraq": "IQ",
+    "Ireland": "IE", "Israel": "IL", "Italy": "IT", "Ivory Coast": "CI", "Jamaica": "JM",
+    "Japan": "JP", "Jordan": "JO", "Kazakhstan": "KZ", "Kenya": "KE", "Kiribati": "KI",
+    "Korea, North": "KP", "Korea, South": "KR", "Kosovo": "XK", "Kuwait": "KW", "Kyrgyzstan": "KG",
+    "Laos": "LA", "Latvia": "LV", "Lebanon": "LB", "Lesotho": "LS", "Liberia": "LR",
+    "Libya": "LY", "Liechtenstein": "LI", "Lithuania": "LT", "Luxembourg": "LU", "Madagascar": "MG",
+    "Malawi": "MW", "Malaysia": "MY", "Maldives": "MV", "Mali": "ML", "Malta": "MT",
+    "Marshall Islands": "MH", "Mauritania": "MR", "Mauritius": "MU", "Mexico": "MX", "Micronesia": "FM",
+    "Moldova": "MD", "Monaco": "MC", "Mongolia": "MN", "Montenegro": "ME", "Morocco": "MA",
+    "Mozambique": "MZ", "Myanmar": "MM", "Namibia": "NA", "Nauru": "NR", "Nepal": "NP",
+    "Netherlands": "NL", "New Zealand": "NZ", "Nicaragua": "NI", "Niger": "NE", "Nigeria": "NG",
+    "North Macedonia": "MK", "Norway": "NO", "Oman": "OM", "Pakistan": "PK", "Palau": "PW",
+    "Panama": "PA", "Papua New Guinea": "PG", "Paraguay": "PY", "Peru": "PE", "Philippines": "PH",
+    "Poland": "PL", "Portugal": "PT", "Qatar": "QA", "Romania": "RO", "Russia": "RU",
+    "Rwanda": "RW", "Saint Kitts and Nevis": "KN", "Saint Lucia": "LC", "Saint Vincent and the Grenadines": "VC",
+    "Samoa": "WS", "San Marino": "SM", "Sao Tome and Principe": "ST", "Saudi Arabia": "SA", "Senegal": "SN",
+    "Serbia": "RS", "Seychelles": "SC", "Sierra Leone": "SL", "Singapore": "SG", "Slovakia": "SK",
+    "Slovenia": "SI", "Solomon Islands": "SB", "Somalia": "SO", "South Africa": "ZA", "South Sudan": "SS",
+    "Spain": "ES", "Sri Lanka": "LK", "Sudan": "SD", "Suriname": "SR", "Sweden": "SE",
+    "Switzerland": "CH", "Syria": "SY", "Taiwan": "TW", "Tajikistan": "TJ", "Tanzania": "TZ",
+    "Thailand": "TH", "Togo": "TG", "Tonga": "TO", "Trinidad and Tobago": "TT", "Tunisia": "TN",
+    "Turkey": "TR", "Turkmenistan": "TM", "Tuvalu": "TV", "Uganda": "UG", "Ukraine": "UA",
+    "United Arab Emirates": "AE", "United Kingdom": "GB", "United States": "US", "Uruguay": "UY",
+    "Uzbekistan": "UZ", "Vanuatu": "VU", "Vatican City": "VA", "Venezuela": "VE", "Vietnam": "VN",
+    "Yemen": "YE", "Zambia": "ZM", "Zimbabwe": "ZW"
+  };
 
-    function getFlagEmoji(countryName) {
-      const iso = countryNameToISO[countryName];
-      if (!iso) return '';
-      return iso.toUpperCase().split('').map(c =>
-        String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
-      ).join('');
-    }
+  function getFlagEmoji(countryName) {
+    const iso = countryNameToISO[countryName];
+    if (!iso) return '';
+    return iso.toUpperCase().split('').map(c =>
+      String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
+    ).join('');
+  }
 
-    let selectedCountry = null;
-    let attempts = {};
-    let score = 0;
+  let selectedCountry = null;
+  let attempts = {};
+  let score = 0;
 
-    const svg = d3.select("#map")
-      .append("svg")
-      .attr("width", "100%")
-      .attr("height", "100%")
-      .attr("viewBox", "0 0 800 450");
+  // D3 SVG setup
+  const svg = d3.select("#map")
+    .append("svg")
+    .attr("width", "100%")
+    .attr("height", "100%")
+    .attr("viewBox", "0 0 800 450");
 
-    const projection = d3.geoNaturalEarth1().scale(130).translate([400, 225]);
-    const path = d3.geoPath().projection(projection);
+  const projection = d3.geoNaturalEarth1().scale(140).translate([400, 225]);
+  const path = d3.geoPath().projection(projection);
 
-    // Zoom and pan
-    const zoom = d3.zoom()
-      .scaleExtent([1, 8])
-      .on("zoom", (event) => {
-        g.attr("transform", event.transform);
-      });
-
-    svg.call(zoom);
-
-    const g = svg.append("g");
-
-    d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function(data) {
-      g.selectAll("path")
-        .data(data.features)
-        .join("path")
-        .attr("d", path)
-        .attr("class", "country")
-        .attr("id", d => d.properties.name)
-        .on("click", function(event, d) {
-          if (attempts[d.properties.name] === -1) {
-            alert("Answer: " + d.properties.name);
-            return;
-          }
-          selectedCountry = d.properties.name;
-          document.getElementById("autocomplete").value = "";
-          document.getElementById("autocomplete").focus();
-        });
-      // NO text elements added — no place names visible
-
-      const datalist = document.getElementById("countries");
-      Object.keys(countryData).forEach(country => {
-        const option = document.createElement("option");
-        option.value = country;
-        datalist.appendChild(option);
-      });
+  const zoom = d3.zoom()
+    .scaleExtent([1, 8])
+    .on("zoom", (event) => {
+      g.attr("transform", event.transform);
     });
 
-    function showFlagCongrats(flag) {
-      const flagDiv = document.getElementById("flagCongrats");
-      flagDiv.textContent = flag;
-      flagDiv.style.opacity = 1;
-      setTimeout(() => {
-        flagDiv.style.opacity = 0;
-      }, 1500);
-    }
+  svg.call(zoom);
 
-    function resetZoom() {
-      svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
-    }
+  const g = svg.append("g");
 
-    document.getElementById("resetZoomBtn").addEventListener("click", resetZoom);
-
-    document.getElementById("autocomplete").addEventListener("change", function() {
-      const guess = this.value.trim();
-      if (!selectedCountry || !guess) return;
-
-      if (!attempts[selectedCountry]) attempts[selectedCountry] = 0;
-
-      if (attempts[selectedCountry] === -1) {
-        this.value = "";
-        selectedCountry = null;
-        return;
-      }
-
-      if (guess.toLowerCase() === selectedCountry.toLowerCase()) {
-        score += attempts[selectedCountry] === 0 ? 2 : 1;
-        d3.select(`#${CSS.escape(selectedCountry)}`).classed("correct", true);
-        attempts[selectedCountry] = 999; // solved
-
-        showFlagCongrats(getFlagEmoji(selectedCountry));
-      } else {
-        attempts[selectedCountry]++;
-        if (attempts[selectedCountry] >= 3) {
-          d3.select(`#${CSS.escape(selectedCountry)}`).classed("wrong", true);
-          attempts[selectedCountry] = -1; // lock
+  // Load GeoJSON and render countries
+  d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function(data) {
+    g.selectAll("path")
+      .data(data.features)
+      .join("path")
+      .attr("d", path)
+      .attr("class", "country")
+      .attr("id", d => d.properties.name)
+      .on("click", function(event, d) {
+        if (attempts[d.properties.name] === -1) {
+          alert("Answer: " + d.properties.name);
+          return;
         }
-      }
+        selectCountry(d.properties.name);
+        focusInput();
+      });
+    buildAutocompleteList();
+  });
 
-      document.getElementById("score").textContent = `Score: ${score}`;
-      this.value = "";
-      selectedCountry = null;
-    });
+  // Select a country visually and logically
+  function selectCountry(name) {
+    if (selectedCountry) {
+      d3.select(`#${CSS.escape(selectedCountry)}`).classed("selected-country", false);
+    }
+    selectedCountry = name;
+    d3.select(`#${CSS.escape(selectedCountry)}`).classed("selected-country", true);
+  }
 
-    document.getElementById("hintBtn").addEventListener("click", function() {
-      if (!selectedCountry) {
-        alert("Select a country first.");
-        return;
-      }
-      const capital = countryData[selectedCountry];
-      if (capital) alert("Capital: " + capital);
-      else alert("No capital data available.");
+  // Focus input field
+  function focusInput() {
+    document.getElementById("autocomplete").focus();
+  }
+
+  // Show flag emoji pop-up briefly
+  function showFlagCongrats(flag) {
+    const flagDiv = document.getElementById("flagCongrats");
+    flagDiv.textContent = flag;
+    flagDiv.style.opacity = 1;
+    setTimeout(() => {
+      flagDiv.style.opacity = 0;
+    }, 1500);
+  }
+
+  // Reset zoom
+  function resetZoom() {
+    svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+  }
+  document.getElementById("resetZoomBtn").addEventListener("click", resetZoom);
+
+  // Score update
+  function updateScore() {
+    document.getElementById("score").textContent = `Score: ${score}`;
+  }
+
+  // Build custom autocomplete list with filtering and flags
+  const input = document.getElementById("autocomplete");
+  const autocompleteList = document.getElementById("autocompleteList");
+
+  let autocompleteItems = [];
+
+  function buildAutocompleteList() {
+    autocompleteItems = Object.keys(countryData).map(country => ({
+      name: country,
+      flag: getFlagEmoji(country)
+    }));
+  }
+
+  function filterAutocomplete(value) {
+    const valLower = value.toLowerCase();
+    return autocompleteItems.filter(item => item.name.toLowerCase().includes(valLower));
+  }
+
+  // Render autocomplete dropdown
+  function renderAutocomplete(value) {
+    if (!value) {
+      autocompleteList.innerHTML = "";
+      autocompleteList.hidden = true;
+      return;
+    }
+    const filtered = filterAutocomplete(value);
+    if (filtered.length === 0) {
+      autocompleteList.innerHTML = "<div style='padding:6px 10px;color:#999;'>No matches</div>";
+      autocompleteList.hidden = false;
+      return;
+    }
+    autocompleteList.innerHTML = "";
+    filtered.forEach(item => {
+      const div = document.createElement("div");
+      div.classList.add("autocomplete-item");
+      div.innerHTML = `<span class="flag-emoji">${item.flag}</span> ${item.name}`;
+      div.addEventListener("click", () => {
+        input.value = item.name;
+        autocompleteList.hidden = true;
+        handleGuess(item.name);
+      });
+      autocompleteList.appendChild(div);
     });
-  </script>
+    autocompleteList.hidden = false;
+  }
+
+  // Handle guess submission
+  function handleGuess(guess) {
+    if (!selectedCountry || !guess) return;
+
+    if (!attempts[selectedCountry]) attempts[selectedCountry] = 0;
+
+    if (attempts[selectedCountry] === -1) {
+      input.value = "";
+      selectCountry(null);
+      return;
+    }
+
+    if (guess.toLowerCase() === selectedCountry.toLowerCase()) {
+      score += attempts[selectedCountry] === 0 ? 2 : 1;
+      d3.select(`#${CSS.escape(selectedCountry)}`).classed("correct", true);
+      attempts[selectedCountry] = 999; // solved
+      showFlagCongrats(getFlagEmoji(selectedCountry));
+      selectCountry(null);
+    } else {
+      attempts[selectedCountry]++;
+      if (attempts[selectedCountry] >= 3) {
+        d3.select(`#${CSS.escape(selectedCountry)}`).classed("wrong", true);
+        attempts[selectedCountry] = -1; // locked out
+      }
+    }
+    updateScore();
+    input.value = "";
+  }
+
+  input.addEventListener("input", e => {
+    renderAutocomplete(e.target.value);
+  });
+
+  input.addEventListener("keydown", e => {
+    // Hide autocomplete on escape
+    if (e.key === "Escape") {
+      autocompleteList.hidden = true;
+      input.blur();
+      return;
+    }
+    // On Enter submit guess if autocomplete visible and item selected or just guess current input
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const guess = input.value.trim();
+      if (guess) {
+        autocompleteList.hidden = true;
+        handleGuess(guess);
+      }
+    }
+  });
+
+  // Hide autocomplete if clicking outside
+  document.addEventListener("click", e => {
+    if (!document.getElementById("controls").contains(e.target)) {
+      autocompleteList.hidden = true;
+    }
+  });
+
+  // Hint button
+  document.getElementById("hintBtn").addEventListener("click", () => {
+    if (!selectedCountry) {
+      alert("Select a country first.");
+      return;
+    }
+    const capital = countryData[selectedCountry];
+    if (capital) alert(`Capital of ${selectedCountry}: ${capital}`);
+    else alert("No capital data available.");
+  });
+
+</script>
 </body>
 </html>
