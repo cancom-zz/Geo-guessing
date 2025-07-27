@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Guess the Country - Modern UI</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #f5f7fa;
+  }
+  #map {
+    width: 90vw;
+    max-width: 1000px;
+    height: 80vh;
+    border: 1px solid #ccc;
+    background-color: #eaeaea;
+    touch-action: none;
+  }
+  #controls {
+    margin: 10px 0;
+    width: 90vw;
+    max-width: 400px;
+    position: relative;
+    user-select: none;
+  }
+  #autocomplete {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 1.1em;
+    box-sizing: border-box;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    transition: border-color 0.3s ease;
+  }
+  #autocomplete:focus {
+    outline: none;
+    border-color: #0078d4;
+    box-shadow: 0 0 6px #0078d4aa;
+  }
+  #autocompleteList {
+    position: absolute;
+    top: 110%;
+    left: 0;
+    right: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    z-index: 100;
+  }
+  .autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1em;
+    transition: background-color 0.2s ease;
+  }
+  .autocomplete-item:hover, .autocomplete-item.active {
+    background-color: #0078d4;
+    color: white;
+  }
+  .flag-emoji {
+    font-size: 1.4em;
+    user-select: none;
+  }
+  #buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  button {
+    cursor: pointer;
+    padding: 10px 20px;
+    font-size: 1em;
+    border: 1px solid #666;
+    background-color: #f0f0f0;
+    border-radius: 6px;
+    user-select: none;
+    transition: background-color 0.3s ease;
+  }
+  button:hover {
+    background-color: #ddd;
+  }
+  .country {
+    cursor: pointer;
+    stroke: #fff;
+    stroke-width: 0.5;
+    fill: #b0b0b0;
+    transition: fill 0.3s, stroke-width 0.3s;
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  .selected-country {
+    stroke: #ff6600 !important;
+    stroke-width: 3px !important;
+    filter: drop-shadow(0 0 6px #ff6600aa);
+  }
+  .correct {
+    fill: #28a745 !important;
+    stroke: #1e7e34 !important;
+    stroke-width: 2px !important;
+  }
+  .wrong {
+    fill: #dc3545 !important;
+    stroke: #a71d2a !important;
+    stroke-width: 2px !important;
+  }
+  #score {
+    margin-top: 12px;
+    font-weight: 700;
+    font-size: 1.3em;
+    color: #333;
+  }
+  #flagCongrats {
+    position: fixed;
+    top: 30px;
+    right: 30px;
+    font-size: 4em;
+    pointer-events: none;
+    user-select: none;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    z-index: 1000;
+  }
+
+  /* Modal styles */
+  #modalBackdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.35);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  #modal {
+    background: white;
+    border-radius: 10px;
+    padding: 24px 32px;
+    max-width: 320px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    font-size: 1.1em;
+    color: #222;
+    text-align: center;
+    position: relative;
+  }
+  #modal button {
+    margin-top: 20px;
+    background-color: #0078d4;
+    border: none;
+    color: white;
+    padding: 10px 24px;
+    font-size: 1em;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  #modal button:hover {
+    background-color: #005ea2;
+  }
+</style>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <h2>Guess the Country</h2>
+  <div id="map"></div>
+  <div id="controls">
+    <input id="autocomplete" placeholder="Type a country..." autocomplete="off" />
+    <div id="autocompleteList" hidden></div>
+    <div id="buttons">
+      <button id="hintBtn" type="button">Hint</button>
+      <button id="resetZoomBtn" type="button">Reset Zoom</button>
+    </div>
+    <div id="score">Score: 0</div>
+  </div>
+  <div id="flagCongrats"></div>
+
+  <!-- Modal -->
+  <div id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalMessage" tabindex="-1">
+    <div id="modal">
+      <div id="modalMessage"></div>
+      <button id="modalCloseBtn" aria-label="Close dialog">OK</button>
+    </div>
+  </div>
+
+<script>
+  // Same country data and ISO as before (omitted here for brevity)
+  const countryData = {/* ... (full countryData as before) ... */};
+  const countryNameToISO = {/* ... (full ISO mapping as before) ... */};
+
+  // Helper function to get flag emoji from ISO code
+  function getFlagEmoji(countryName) {
+    const iso = countryNameToISO[countryName];
+    if (!iso) return '';
+    return iso.toUpperCase().split('').map(c =>
+      String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
+    ).join('');
+  }
+
+  // Modal controls
+  const modalBackdrop = document.getElementById("modalBackdrop");
+  const modalMessage = document.getElementById("modalMessage");
+  const modalCloseBtn = document.getElementById("modalCloseBtn");
+
+  function showModal(message) {
+    modalMessage.textContent = message;
+    modalBackdrop.style.display = "flex";
+    modalCloseBtn.focus();
+  }
+  function hideModal() {
+    modalBackdrop.style.display = "none";
+    document.getElementById("autocomplete").focus();
+  }
+  modalCloseBtn.addEventListener("click", hideModal);
+  modalBackdrop.addEventListener("click", (e) => {
+    if (e.target === modalBackdrop) hideModal();
+  });
+  window.addEventListener("keydown", e => {
+    if (e.key === "Escape" && modalBackdrop.style.display === "flex") {
+      hideModal();
+    }
+  });
+
+  // Variables & D3 setup
+  let selectedCountry = null;
+  let attempts = {};
+  let score = 0;
+
+  const svg = d3.select("#map")
+    .append("svg")
+    .attr("width", "100%")
+    .attr("height", "100%")
+    .attr("viewBox", "0 0 800 450");
+
+  const projection = d3.geoNaturalEarth1().scale(140).translate([400, 225]);
+  const path = d3.geoPath().projection(projection);
+
+  const zoom = d3.zoom()
+    .scaleExtent([1, 8])
+    .on("zoom", event => {
+      g.attr("transform", event.transform);
+    });
+
+  svg.call(zoom);
+
+  const g = svg.append("g");
+
+  d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(data => {
+    g.selectAll("path")
+      .data(data.features)
+      .join("path")
+      .attr("d", path)
+      .attr("class", "country")
+      .attr("id", d => d.properties.name)
+      .on("click", (event, d) => {
+        if (attempts[d.properties.name] === -1) {
+          showModal(`Answer: ${d.properties.name}`);
+          return;
+        }
+        selectCountry(d.properties.name);
+        focusInput();
+      });
+    buildAutocompleteList();
+  });
+
+  function selectCountry(name) {
+    if (selectedCountry) {
+      d3.select(`#${CSS.escape(selectedCountry)}`).classed("selected-country", false);
+    }
+    selectedCountry = name;
+    if (selectedCountry) {
+      d3.select(`#${CSS.escape(selectedCountry)}`).classed("selected-country", true);
+    }
+  }
+
+  function focusInput() {
+    document.getElementById("autocomplete").focus();
+  }
+
+  // Flag emoji popup
+  const flagCongrats = document.getElementById("flagCongrats");
+  function showFlagCongrats(flag) {
+    flagCongrats.textContent = flag;
+    flagCongrats.style.opacity = 1;
+    setTimeout(() => {
+      flagCongrats.style.opacity = 0;
+    }, 1600);
+  }
+
+  // Reset zoom
+  function resetZoom() {
+    svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+  }
+  document.getElementById("resetZoomBtn").addEventListener("click", resetZoom);
+
+  // Score update
+  function updateScore() {
+    document.getElementById("score").textContent = `Score: ${score}`;
+  }
+
+  // Autocomplete logic
+  const input = document.getElementById("autocomplete");
+  const autocompleteList = document.getElementById("autocompleteList");
+  let autocompleteItems = [];
+
+  function buildAutocompleteList() {
+    autocompleteItems = Object.keys(countryData).map(country => ({
+      name: country,
+      flag: getFlagEmoji(country)
+    }));
+  }
+
+  function filterAutocomplete(value) {
+    const valLower = value.toLowerCase();
+    return autocompleteItems.filter(item => item.name.toLowerCase().includes(valLower));
+  }
+
+  function renderAutocomplete(value) {
+    if (!value) {
+      autocompleteList.innerHTML = "";
+      autocompleteList.hidden = true;
+      return;
+    }
+    const filtered = filterAutocomplete(value);
+    if (filtered.length === 0) {
+      autocompleteList.innerHTML = "<div style='padding:8px 12px; color:#999;'>No matches</div>";
+      autocompleteList.hidden = false;
+      return;
+    }
+    autocompleteList.innerHTML = "";
+    filtered.forEach(item => {
+      const div = document.createElement("div");
+      div.classList.add("autocomplete-item");
+      div.innerHTML = `<span class="flag-emoji">${item.flag}</span> ${item.name}`;
+      div.addEventListener("click", () => {
+        input.value = item.name;
+        autocompleteList.hidden = true;
+        handleGuess(item.name);
+      });
+      autocompleteList.appendChild(div);
+    });
+    autocompleteList.hidden = false;
+  }
+
+  function handleGuess(guess) {
+    if (!selectedCountry || !guess) return;
+
+    if (!attempts[selectedCountry]) attempts[selectedCountry] = 0;
+
+    if (attempts[selectedCountry] === -1) {
+      input.value = "";
+      selectCountry(null);
+      return;
+    }
+
+    if (guess.toLowerCase() === selectedCountry.toLowerCase()) {
+      score += attempts[selectedCountry] === 0 ? 2 : 1;
+      d3.select(`#${CSS.escape(selectedCountry)}`).classed("correct", true);
+      attempts[selectedCountry] = 999;
+      showFlagCongrats(getFlagEmoji(selectedCountry));
+      selectCountry(null);
+      showModal(`Correct! 🎉 ${guess} is the right answer.`);
+    } else {
+      attempts[selectedCountry]++;
+      if (attempts[selectedCountry] >= 3) {
+        d3.select(`#${CSS.escape(selectedCountry)}`).classed("wrong", true);
+        attempts[selectedCountry] = -1;
+        showModal(`Wrong! The correct answer was ${selectedCountry}.`);
+        selectCountry(null);
+      } else {
+        showModal(`Wrong guess, try again! (${attempts[selectedCountry]} of 3 attempts)`);
+      }
+    }
+    updateScore();
+    input.value = "";
+  }
+
+  input.addEventListener("input", e => {
+    renderAutocomplete(e.target.value);
+  });
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      autocompleteList.hidden = true;
+      input.blur();
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const guess = input.value.trim();
+      if (guess) {
+        autocompleteList.hidden = true;
+        handleGuess(guess);
+      }
+    }
+  });
+
+  // Hide autocomplete when clicking outside controls
+  document.addEventListener("click", e => {
+    if (!document.getElementById("controls").contains(e.target)) {
+      autocompleteList.hidden = true;
+    }
+  });
+
+  // Hint button uses modal now
+  document.getElementById("hintBtn").addEventListener("click", () => {
+    if (!selectedCountry) {
+      showModal("Select a country first.");
+      return;
+    }
+    const capital = countryData[selectedCountry];
+    if (capital) showModal(`Capital of ${selectedCountry}: ${capital}`);
+    else showModal("No capital data available.");
+  });
+</script>
+</body>
+</html>
