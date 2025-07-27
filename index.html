@@ -403,18 +403,13 @@
     return autocompleteItems.filter(item => item.name.toLowerCase().includes(valLower));
   }
 
-  function renderAutocomplete(value) {
-    if (!value) {
-      autocompleteList.innerHTML = "";
-      autocompleteList.hidden = true;
-      return;
-    }
-    const filtered = filterAutocomplete(value);
-    if (filtered.length === 0) {
-      autocompleteList.innerHTML = "<div style='padding:8px 12px; color:#999;'>No matches</div>";
-      autocompleteList.hidden = false;
-      return;
-    }
+function renderAutocomplete(value) {
+  const valLower = value.toLowerCase();
+  const filtered = value ? autocompleteItems.filter(item => item.name.toLowerCase().includes(valLower)) : autocompleteItems;
+
+  if (filtered.length === 0) {
+    autocompleteList.innerHTML = "<div style='padding:8px 12px; color:#999;'>No matches</div>";
+  } else {
     autocompleteList.innerHTML = "";
     filtered.forEach(item => {
       const div = document.createElement("div");
@@ -422,13 +417,13 @@
       div.innerHTML = `<span class="flag-emoji">${item.flag}</span> ${item.name}`;
       div.addEventListener("click", () => {
         input.value = item.name;
-        autocompleteList.hidden = true;
         handleGuess(item.name);
       });
       autocompleteList.appendChild(div);
     });
-    autocompleteList.hidden = false;
   }
+  autocompleteList.hidden = false;  // Always visible
+}
 
   function handleGuess(guess) {
     if (!selectedCountry || !guess) return;
@@ -492,14 +487,14 @@
 
   // Hint button uses modal now
   document.getElementById("hintBtn").addEventListener("click", () => {
-    if (!selectedCountry) {
-      showModal("Select a country first.");
-      return;
-    }
-    const capital = countryData[selectedCountry];
-    if (capital) showModal(`Capital of ${selectedCountry}: ${capital}`);
-    else showModal("No capital data available.");
-  });
+     if (!selectedCountry) {
+    showModal("Select a country first.");
+    return;
+  }
+  const capital = countryData[selectedCountry];
+  if (capital) showModal(`Capital: ${capital}`);
+  else showModal("No capital data available.");
+});
 </script>
 </body>
 </html>
