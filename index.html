@@ -43,18 +43,18 @@
     border-color: #0078d4;
     box-shadow: 0 0 6px #0078d4aa;
   }
-  #autocompleteList {
-    position: absolute;
-    left: 0;
-    right: 0;
-    max-height: 220px;
-    overflow-y: auto;
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 0 0 8px 8px;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-    z-index: 100;
-  }
+#autocompleteList {
+  position: absolute;
+  background: white;
+  border: 1px solid #ccc;
+  max-height: 200px;
+  overflow-y: auto;
+  width: 250px;
+  box-sizing: border-box;
+  z-index: 1000;
+  /* top or bottom will be set dynamically by JS */
+}
+
   .autocomplete-item {
     padding: 8px 12px;
     cursor: pointer;
@@ -631,20 +631,24 @@
     }
   });
 
-  function updateAutocompletePosition() {
-    const rect = input.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const spaceBelow = viewportHeight - rect.bottom;
-    const dropdownHeight = autocompleteList.offsetHeight || 200;
+ function updateAutocompletePosition() {
+  const rect = input.getBoundingClientRect();
+  const viewportHeight = window.innerHeight;
+  const spaceBelow = viewportHeight - rect.bottom;
+  const dropdownHeight = autocompleteList.offsetHeight || 200;
+  const margin = 4; // small margin between input and dropdown
 
-    if (spaceBelow < dropdownHeight + 10) {
-      autocompleteList.style.top = "auto";
-      autocompleteList.style.bottom = `${rect.height + 4}px`;
-    } else {
-      autocompleteList.style.bottom = "auto";
-      autocompleteList.style.top = `${rect.height + 4}px`;
-    }
+  if (spaceBelow < dropdownHeight + margin) {
+    // Show above input, dropdown bottom aligned just above input top minus margin
+    autocompleteList.style.bottom = `${rect.height + margin}px`;
+    autocompleteList.style.top = "auto";
+  } else {
+    // Show below input, dropdown top aligned just below input bottom plus margin
+    autocompleteList.style.top = `${rect.height + margin}px`;
+    autocompleteList.style.bottom = "auto";
   }
+}
+
   window.addEventListener("resize", updateAutocompletePosition);
   window.addEventListener("scroll", updateAutocompletePosition, true);
 
